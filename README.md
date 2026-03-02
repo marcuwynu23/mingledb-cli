@@ -1,6 +1,6 @@
 # mingledb-cli
 
-Interactive SQLite-style shell for [mingleDB](https://github.com/marcuwynu23/mingledb) / [gomingleDB](../gomingleDB) (`.mgdb`) databases.
+Interactive SQLite-style shell for [mingleDB](https://github.com/marcuwynu23/mingledb) / [gomingleDB](https://github.com/marcuwynu23/gomingleDB) (`.mgdb`) databases.
 
 ## Build
 
