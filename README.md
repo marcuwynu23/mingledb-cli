@@ -1,6 +1,6 @@
 # MingleDB CLI
 
-**A SQLite-style interactive shell for MingleDB.**  
+**A interactive shell for MingleDB.**  
 Connect to any `.mgdb` database directory and run queries, manage collections, and handle auth from the terminal.
 
 ---
@@ -9,13 +9,13 @@ Connect to any `.mgdb` database directory and run queries, manage collections, a
 
 MingleDB CLI is the official command-line interface for [MingleDB](https://github.com/marcuwynu23/mingledb) and [gomingleDB](../gomingleDB). It provides a familiar, REPL-style experience similar to the SQLite shell: dot commands for meta-operations and data commands for CRUD.
 
-| Feature | Description |
-|--------|-------------|
-| **Dot commands** | `.exit`, `.databases`, `.collections`, `.schema`, `.open`, `.auth` |
-| **CRUD** | `insert`, `find`, `findOne`, `update`, `delete` with JSON docs and filters |
-| **Schema** | Define and inspect collection schemas from the shell |
-| **Auth** | Register, login, logout, and check session status |
-| **Portable** | Single binary; works with any mingleDB/gomingleDB `.mgdb` directory |
+| Feature          | Description                                                                |
+| ---------------- | -------------------------------------------------------------------------- |
+| **Dot commands** | `.exit`, `.databases`, `.collections`, `.schema`, `.open`, `.auth`         |
+| **CRUD**         | `insert`, `find`, `findOne`, `update`, `delete` with JSON docs and filters |
+| **Schema**       | Define and inspect collection schemas from the shell                       |
+| **Auth**         | Register, login, logout, and check session status                          |
+| **Portable**     | Single binary; works with any mingleDB/gomingleDB `.mgdb` directory        |
 
 ---
 
@@ -70,18 +70,18 @@ mingledb> .exit
 
 All meta-commands start with a dot (`.`). They control the session, current database, and auth.
 
-| Command | Description |
-|--------|-------------|
-| `.exit` | Exit the shell (alias: `.quit`) |
-| `.help` | Print help and command reference |
-| `.databases` | Print the current database directory path |
-| `.open PATH` | Switch to another database directory |
-| `.collections` | List all collection names (alias: `.tables`) |
-| `.schema [NAME]` | With `NAME`: show schema for that collection. Without: list collections that have a schema defined |
-| `.auth register USER PASS` | Register a new user |
-| `.auth login USER PASS` | Log in as a user |
-| `.auth logout` | End the current session |
-| `.auth status` | Show the currently logged-in user (or “not logged in”) |
+| Command                    | Description                                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| `.exit`                    | Exit the shell (alias: `.quit`)                                                                    |
+| `.help`                    | Print help and command reference                                                                   |
+| `.databases`               | Print the current database directory path                                                          |
+| `.open PATH`               | Switch to another database directory                                                               |
+| `.collections`             | List all collection names (alias: `.tables`)                                                       |
+| `.schema [NAME]`           | With `NAME`: show schema for that collection. Without: list collections that have a schema defined |
+| `.auth register USER PASS` | Register a new user                                                                                |
+| `.auth login USER PASS`    | Log in as a user                                                                                   |
+| `.auth logout`             | End the current session                                                                            |
+| `.auth status`             | Show the currently logged-in user (or “not logged in”)                                             |
 
 ---
 
@@ -195,17 +195,17 @@ Schema defined for users
 
 Use these inside filter/query JSON for `find`, `findOne`, `update`, and `delete`:
 
-| Operator | Meaning | Example |
-|----------|---------|--------|
-| `$gt` | Greater than | `{"age":{"$gt":18}}` |
-| `$gte` | Greater than or equal | `{"age":{"$gte":18}}` |
-| `$lt` | Less than | `{"age":{"$lt":65}}` |
-| `$lte` | Less than or equal | `{"age":{"$lte":65}}` |
-| `$eq` | Equal | `{"status":{"$eq":"active"}}` |
-| `$ne` | Not equal | `{"status":{"$ne":"archived"}}` |
-| `$in` | Value in list | `{"role":{"$in":["admin","editor"]}}` |
-| `$nin` | Value not in list | `{"role":{"$nin":["banned"]}}` |
-| `$regex` | Regular expression | `{"name":{"$regex":"^Ali","$options":"i"}}` |
+| Operator | Meaning               | Example                                     |
+| -------- | --------------------- | ------------------------------------------- |
+| `$gt`    | Greater than          | `{"age":{"$gt":18}}`                        |
+| `$gte`   | Greater than or equal | `{"age":{"$gte":18}}`                       |
+| `$lt`    | Less than             | `{"age":{"$lt":65}}`                        |
+| `$lte`   | Less than or equal    | `{"age":{"$lte":65}}`                       |
+| `$eq`    | Equal                 | `{"status":{"$eq":"active"}}`               |
+| `$ne`    | Not equal             | `{"status":{"$ne":"archived"}}`             |
+| `$in`    | Value in list         | `{"role":{"$in":["admin","editor"]}}`       |
+| `$nin`   | Value not in list     | `{"role":{"$nin":["banned"]}}`              |
+| `$regex` | Regular expression    | `{"name":{"$regex":"^Ali","$options":"i"}}` |
 
 You can combine operators (e.g. `{"age":{"$gte":18,"$lt":60}}`).
 
@@ -255,7 +255,7 @@ Bye.
 
 ## Related
 
-- [MingleDB](https://github.com/marcuwynu23/mingledb) — Node.js implementation  
+- [MingleDB](https://github.com/marcuwynu23/mingledb) — Node.js implementation
 - [gomingleDB](../gomingleDB) — Go implementation (used by this CLI)
 
 ---
