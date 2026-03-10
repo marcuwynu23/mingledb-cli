@@ -14,10 +14,11 @@ import (
 	"gomingleDB"
 )
 
+var version = "1.0" // set by -ldflags on release build
+
 const (
-	prompt      = "mingledb> "
-	version     = "mingledb-cli 1.0"
-	defaultDir  = "./mydb"
+	prompt     = "mingledb> "
+	defaultDir = "./mydb"
 	helpMessage = `Dot commands:
   .exit, .quit       Exit the CLI
   .help              Show this help
@@ -63,7 +64,7 @@ func main() {
 	}
 	sess := &session{db: gomingleDB.New(dbDir), dbDir: dbDir}
 
-	fmt.Fprintf(os.Stderr, "%s\nType .help for commands.\n\n", version)
+	fmt.Fprintf(os.Stderr, "mingledb-cli %s\nType .help for commands.\n\n", version)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	var lineBuf strings.Builder
