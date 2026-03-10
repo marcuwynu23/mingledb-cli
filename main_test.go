@@ -33,6 +33,21 @@ func captureStdoutStderr(fn func()) string {
 	return <-outDone
 }
 
+func TestResolveDBPath(t *testing.T) {
+	// Directory path unchanged (absolute)
+	dir := t.TempDir()
+	got := resolveDBPath(dir)
+	if got != dir {
+		t.Errorf("resolveDBPath(dir) = %q, want %q", got, dir)
+	}
+	// .mgdb file path → directory of file
+	mgdbPath := filepath.Join(dir, "store.mgdb")
+	got = resolveDBPath(mgdbPath)
+	if got != dir {
+		t.Errorf("resolveDBPath(.mgdb) = %q, want dir %q", got, dir)
+	}
+}
+
 func TestSplitDotArgs(t *testing.T) {
 	tests := []struct {
 		name string
