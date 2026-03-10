@@ -22,9 +22,8 @@ const (
   .exit, .quit       Exit the CLI
   .help              Show this help
   .databases         Show current database directory
-  .open PATH         Open database directory (default: ./mydb)
-  .collections       List collection names (alias: .tables)
-  .tables            Same as .collections
+  .open PATH         Open database (PATH: directory or .mgdb file; default: ./mydb)
+  .collections       List collection names
   .schema [NAME]     Show schema for collection (or list if no NAME)
   .auth register U P Register user U with password P
   .auth login U P    Log in as user U
@@ -46,12 +45,22 @@ type session struct {
 	dbDir string
 }
 
+// resolveDBPath returns the database directory. If path ends with .mgdb, use its directory (so a file path means "use the dir containing this file").
+func resolveDBPath(path string) string {
+	abs, _ := filepath.Abs(path)
+	if strings.HasSuffix(strings.ToLower(abs), ".mgdb") {
+		return filepath.Dir(abs)
+	}
+	return abs
+}
+
 func main() {
 	dbDir := defaultDir
 	if len(os.Args) > 1 {
-		dbDir = os.Args[1]
+		dbDir = resolveDBPath(os.Args[1])
+	} else {
+		dbDir, _ = filepath.Abs(dbDir)
 	}
-	dbDir, _ = filepath.Abs(dbDir)
 	sess := &session{db: gomingleDB.New(dbDir), dbDir: dbDir}
 
 	fmt.Fprintf(os.Stderr, "%s\nType .help for commands.\n\n", version)
@@ -118,20 +127,16 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		return false
 	case ".open":
 		if len(parts) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: .open PATH")
+			fmt.Fprintln(os.Stderr, "Usage: .open PATH  (PATH can be a directory or a .mgdb file)")
 			return false
 		}
 		path := parts[1]
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "open:", err)
-			return false
-		}
+		absPath := resolveDBPath(path)
 		sess.dbDir = absPath
 		sess.db = gomingleDB.New(absPath)
 		fmt.Fprintln(os.Stderr, "Opened", absPath)
 		return false
-	case ".collections", ".tables":
+	case ".collections":
 		colls, err := db.ListCollections()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "collections:", err)
