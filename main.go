@@ -32,6 +32,7 @@ const (
   .auth logout       Log out current session
   .auth status       Show logged-in user
   .system CMD        Run system command (e.g. .system ls -la)
+  .output PATH       Save in-memory database to file (directory or .mgdb path)
 
 Data commands (JSON for docs/filters):
   insert COLL DOC                    e.g. insert users {"name":"Alice","age":30}
@@ -44,8 +45,9 @@ Data commands (JSON for docs/filters):
 )
 
 type session struct {
-	db    *gomingleDB.MingleDB
-	dbDir string
+	db      *gomingleDB.MingleDB
+	dbDir   string
+	tempDir string // when set, DB is in-memory (temp dir); cleaned up on exit or .output/.open
 }
 
 // resolveDBPath returns the database directory. If path ends with .mgdb, use its directory (so a file path means "use the dir containing this file").
@@ -63,8 +65,18 @@ func main() {
 		dbDir := resolveDBPath(os.Args[1])
 		sess = &session{db: gomingleDB.New(dbDir), dbDir: dbDir}
 	} else {
-		sess = &session{db: nil, dbDir: ""}
+		tempDir, err := os.MkdirTemp("", "mgdb-")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "mgdb: could not create in-memory DB:", err)
+			os.Exit(1)
+		}
+		sess = &session{db: gomingleDB.New(tempDir), dbDir: tempDir, tempDir: tempDir}
 	}
+	defer func() {
+		if sess != nil && sess.tempDir != "" {
+			os.RemoveAll(sess.tempDir)
+		}
+	}()
 
 	fmt.Fprintf(os.Stderr, "mgdb %s\nType .help for commands.\n\n", version)
 
@@ -134,18 +146,76 @@ func runDotCommand(sess *session, line string) (exit bool) {
 			fmt.Println("(no database open)")
 			return false
 		}
-		fmt.Println(db.DBDir())
+		if sess.tempDir != "" {
+			fmt.Println("(memory)")
+		} else {
+			fmt.Println(db.DBDir())
+		}
 		return false
 	case ".open":
 		if len(parts) < 2 {
 			fmt.Fprintln(os.Stderr, "Usage: .open PATH  (PATH can be a directory or a .mgdb file)")
 			return false
 		}
+		if sess.tempDir != "" {
+			os.RemoveAll(sess.tempDir)
+			sess.tempDir = ""
+		}
 		path := parts[1]
 		absPath := resolveDBPath(path)
 		sess.dbDir = absPath
 		sess.db = gomingleDB.New(absPath)
 		fmt.Fprintln(os.Stderr, "Opened", absPath)
+		return false
+	case ".output":
+		if len(parts) < 2 {
+			fmt.Fprintln(os.Stderr, "Usage: .output PATH  (directory or .mgdb path to save in-memory database)")
+			return false
+		}
+		if sess.tempDir == "" {
+			fmt.Fprintln(os.Stderr, "Database is already on disk. Use .open to switch, or .output only applies to in-memory DB.")
+			return false
+		}
+		path := parts[1]
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "output path:", err)
+			return false
+		}
+		if strings.HasSuffix(strings.ToLower(absPath), ".mgdb") {
+			absPath = filepath.Dir(absPath)
+		}
+		if err := os.MkdirAll(absPath, 0755); err != nil {
+			fmt.Fprintln(os.Stderr, "output:", err)
+			return false
+		}
+		outDB := gomingleDB.New(absPath)
+		colls, err := db.ListCollections()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "output:", err)
+			return false
+		}
+		for _, col := range colls {
+			if schema, ok := db.GetSchema(col); ok {
+				outDB.DefineSchema(col, schema)
+			}
+			docs, err := db.Find(col, map[string]interface{}{})
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "output:", col, err)
+				return false
+			}
+			for _, doc := range docs {
+				if err := outDB.InsertOne(col, doc); err != nil {
+					fmt.Fprintln(os.Stderr, "output:", err)
+					return false
+				}
+			}
+		}
+		os.RemoveAll(sess.tempDir)
+		sess.tempDir = ""
+		sess.dbDir = absPath
+		sess.db = outDB
+		fmt.Fprintln(os.Stderr, "Saved to", absPath)
 		return false
 	case ".collections":
 		if db == nil {
