@@ -16,7 +16,7 @@
    - It checks out **mingledb-cli** and **gomingleDB** (sibling), builds the CLI for linux/windows/darwin (amd64 + arm64), and creates a **GitHub Release** with the binaries attached.
 
 4. **Download**
-   Users get the binaries from the **Releases** page of the mingledb-cli repo (e.g. `mingledb-cli-linux-amd64.tar.gz`, `mingledb-cli-windows-amd64.zip`, etc.).
+   Users get the binaries from the **Releases** page of the mingledb-cli repo (e.g. `mgdb-linux-amd64.tar.gz`, `mgdb-windows-amd64.zip`, etc.).
 
 ---
 
@@ -26,11 +26,11 @@ With gomingleDB next to mingledb-cli (e.g. `../gomingleDB`):
 
 ```bash
 cd mingledb-cli
-go build -o mingledb-cli .
+go build -o mgdb .
 ```
 
 On Windows:
 
 ```powershell
-go build -o mingledb-cli.exe .
+go build -o mgdb.exe .
 ```

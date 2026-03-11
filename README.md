@@ -11,7 +11,7 @@ MingleDB CLI is the official command-line interface for [MingleDB](https://githu
 
 | Feature          | Description                                                                |
 | ---------------- | -------------------------------------------------------------------------- |
-| **Dot commands** | `.exit`, `.databases`, `.collections`, `.schema`, `.open`, `.auth`         |
+| **Dot commands** | `.exit`, `.databases`, `.collections`, `.schema`, `.open`, `.auth`, `.system` |
 | **CRUD**         | `insert`, `find`, `findOne`, `update`, `delete` with JSON docs and filters |
 | **Schema**       | Define and inspect collection schemas from the shell                       |
 | **Auth**         | Register, login, logout, and check session status                          |
@@ -32,13 +32,13 @@ Clone or place this repo next to [gomingleDB](../gomingleDB), then build:
 
 ```bash
 cd mingledb-cli
-go build -o mingledb .
+go build -o mgdb .
 ```
 
 On Windows:
 
 ```powershell
-go build -o mingledb.exe .
+go build -o mgdb.exe .
 ```
 
 The binary is self-contained; you can move it anywhere and run it against any mingleDB database directory.
@@ -50,8 +50,8 @@ The binary is self-contained; you can move it anywhere and run it against any mi
 Open a database (default directory is `./mydb` if no path is given):
 
 ```bash
-./mingledb                    # use ./mydb
-./mingledb /path/to/db        # use specified directory
+./mgdb                    # use ./mydb
+./mgdb /path/to/db        # use specified directory
 ```
 
 Then at the prompt:
@@ -76,12 +76,13 @@ All meta-commands start with a dot (`.`). They control the session, current data
 | `.help`                    | Print help and command reference                                                                   |
 | `.databases`               | Print the current database directory path                                                          |
 | `.open PATH`               | Switch to another database directory                                                               |
-| `.collections`             | List all collection names (alias: `.tables`)                                                       |
+| `.collections`             | List all collection names                                                                         |
 | `.schema [NAME]`           | With `NAME`: show schema for that collection. Without: list collections that have a schema defined |
 | `.auth register USER PASS` | Register a new user                                                                                |
 | `.auth login USER PASS`    | Log in as a user                                                                                   |
 | `.auth logout`             | End the current session                                                                            |
-| `.auth status`             | Show the currently logged-in user (or “not logged in”)                                             |
+| `.auth status`             | Show the currently logged-in user (or "not logged in")                                             |
+| `.system CMD [args...]`    | Run a system command (e.g. `.system ls -la`, `.system dir`)                                        |
 
 ---
 
@@ -214,9 +215,9 @@ You can combine operators (e.g. `{"age":{"$gte":18,"$lt":60}}`).
 ## Example Session
 
 ```text
-$ ./mingledb ./data
+$ ./mgdb ./data
 
-mingledb-cli 1.0
+mgdb 1.0
 Type .help for commands.
 
 mingledb> .databases

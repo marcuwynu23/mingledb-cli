@@ -65,39 +65,39 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
         run: |
-          go build -ldflags="-s -w -X main.version=${{ steps.tag.outputs.VERSION }}" -o bin/mingledb-cli${{ matrix.ext }} .
+          go build -ldflags="-s -w -X main.version=${{ steps.tag.outputs.VERSION }}" -o bin/mgdb${{ matrix.ext }} .
 
       - name: Create archive (Linux/macOS)
         if: matrix.os == 'linux' || matrix.os == 'darwin'
         shell: bash
         run: |
           cd bin
-          tar -czf ../mingledb-cli-${{ matrix.os }}-${{ matrix.arch }}.tar.gz mingledb-cli${{ matrix.ext }}
+          tar -czf ../mgdb-${{ matrix.os }}-${{ matrix.arch }}.tar.gz mgdb${{ matrix.ext }}
           cd ..
-          echo "Created mingledb-cli-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+          echo "Created mgdb-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
 
       - name: Create archive (Windows)
         if: matrix.os == 'windows'
         shell: bash
         run: |
           cd bin
-          zip -r ../mingledb-cli-${{ matrix.os }}-${{ matrix.arch }}.zip mingledb-cli${{ matrix.ext }}
+          zip -r ../mgdb-${{ matrix.os }}-${{ matrix.arch }}.zip mgdb${{ matrix.ext }}
           cd ..
-          echo "Created mingledb-cli-${{ matrix.os }}-${{ matrix.arch }}.zip"
+          echo "Created mgdb-${{ matrix.os }}-${{ matrix.arch }}.zip"
 
       - name: Upload artifact (Linux/macOS)
         if: matrix.os == 'linux' || matrix.os == 'darwin'
         uses: actions/upload-artifact@v4
         with:
-          name: mingledb-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: mingledb-cli-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          name: mgdb-${{ matrix.os }}-${{ matrix.arch }}
+          path: mgdb-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
 
       - name: Upload artifact (Windows)
         if: matrix.os == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: mingledb-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: mingledb-cli-${{ matrix.os }}-${{ matrix.arch }}.zip
+          name: mgdb-${{ matrix.os }}-${{ matrix.arch }}
+          path: mgdb-${{ matrix.os }}-${{ matrix.arch }}.zip
 
   release:
     name: Create Release
