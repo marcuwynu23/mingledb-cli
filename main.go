@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -18,18 +20,18 @@ var version = "1.0" // set by -ldflags on release build
 
 const (
 	prompt     = "mingledb> "
-	defaultDir = "./mydb"
 	helpMessage = `Dot commands:
   .exit, .quit       Exit the CLI
   .help              Show this help
   .databases         Show current database directory
-  .open PATH         Open database (PATH: directory or .mgdb file; default: ./mydb)
+  .open PATH         Open database (PATH: directory or .mgdb file)
   .collections       List collection names
   .schema [NAME]     Show schema for collection (or list if no NAME)
   .auth register U P Register user U with password P
   .auth login U P    Log in as user U
   .auth logout       Log out current session
   .auth status       Show logged-in user
+  .system CMD        Run system command (e.g. .system ls -la)
 
 Data commands (JSON for docs/filters):
   insert COLL DOC                    e.g. insert users {"name":"Alice","age":30}
@@ -56,15 +58,15 @@ func resolveDBPath(path string) string {
 }
 
 func main() {
-	dbDir := defaultDir
+	var sess *session
 	if len(os.Args) > 1 {
-		dbDir = resolveDBPath(os.Args[1])
+		dbDir := resolveDBPath(os.Args[1])
+		sess = &session{db: gomingleDB.New(dbDir), dbDir: dbDir}
 	} else {
-		dbDir, _ = filepath.Abs(dbDir)
+		sess = &session{db: nil, dbDir: ""}
 	}
-	sess := &session{db: gomingleDB.New(dbDir), dbDir: dbDir}
 
-	fmt.Fprintf(os.Stderr, "mingledb-cli %s\nType .help for commands.\n\n", version)
+	fmt.Fprintf(os.Stderr, "mgdb %s\nType .help for commands.\n\n", version)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	var lineBuf strings.Builder
@@ -109,6 +111,10 @@ func runCommand(sess *session, line string) (exit bool) {
 		return runDotCommand(sess, line)
 	}
 	// Data commands
+	if sess.db == nil {
+		fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
+		return false
+	}
 	return runDataCommand(sess.db, line)
 }
 
@@ -124,6 +130,10 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		fmt.Fprint(os.Stderr, helpMessage)
 		return false
 	case ".databases":
+		if db == nil {
+			fmt.Println("(no database open)")
+			return false
+		}
 		fmt.Println(db.DBDir())
 		return false
 	case ".open":
@@ -138,6 +148,10 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		fmt.Fprintln(os.Stderr, "Opened", absPath)
 		return false
 	case ".collections":
+		if db == nil {
+			fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
+			return false
+		}
 		colls, err := db.ListCollections()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "collections:", err)
@@ -149,6 +163,10 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		}
 		return false
 	case ".schema":
+		if db == nil {
+			fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
+			return false
+		}
 		if len(parts) < 2 {
 			// List collections that have schema
 			colls, _ := db.ListCollections()
@@ -170,11 +188,42 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		fmt.Println(string(b))
 		return false
 	case ".auth":
+		if db == nil {
+			fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
+			return false
+		}
 		return runAuth(db, parts)
+	case ".system":
+		cmdLine := strings.TrimSpace(strings.TrimPrefix(line, ".system"))
+		if cmdLine == "" {
+			fmt.Fprintln(os.Stderr, "Usage: .system CMD [args...]")
+			return false
+		}
+		return runSystemCommand(cmdLine)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s (use .help)\n", cmd)
 		return false
 	}
+}
+
+func runSystemCommand(cmdLine string) bool {
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", cmdLine)
+	} else {
+		cmd = exec.Command("sh", "-c", cmdLine)
+	}
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			os.Stderr.Write(exitErr.Stderr)
+		}
+		fmt.Fprintln(os.Stderr, "system:", err)
+		return false
+	}
+	return false
 }
 
 func splitDotArgs(line string) []string {

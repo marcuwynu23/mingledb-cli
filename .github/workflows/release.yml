@@ -36,8 +36,16 @@ jobs:
             ext: ""
 
     steps:
-      - name: Checkout code
+      - name: Checkout mingledb-cli
         uses: actions/checkout@v4
+
+      - name: Checkout gomingleDB
+        uses: actions/checkout@v4
+        with:
+          # gomingleDB must exist under the same owner (e.g. marcuwynu23/gomingleDB). Change if your repo is elsewhere.
+          repository: ${{ github.repository_owner }}/gomingleDB
+          path: ../gomingleDB
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
