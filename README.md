@@ -7,7 +7,7 @@ Connect to any `.mgdb` database directory and run queries, manage collections, a
 
 ## Overview
 
-MingleDB CLI is the official command-line interface for [MingleDB](https://github.com/marcuwynu23/mingledb) and [gomingleDB](../gomingleDB). It provides a familiar, REPL-style experience similar to the SQLite shell: dot commands for meta-operations and data commands for CRUD.
+MingleDB CLI is the official command-line interface for [MingleDB](https://github.com/mingledb/mingledb) and [gomingleDB](https://github.com/mingledb/gomingleDB). It provides a familiar, REPL-style experience similar to the SQLite shell: dot commands for meta-operations and data commands for CRUD.
 
 | Feature          | Description                                                                |
 | ---------------- | -------------------------------------------------------------------------- |
@@ -22,13 +22,13 @@ MingleDB CLI is the official command-line interface for [MingleDB](https://githu
 ## Prerequisites
 
 - **Go 1.21+**
-- **gomingleDB** in the parent directory (e.g. `../gomingleDB`) for building the CLI
+- Access to the `github.com/mingledb/gomingleDB` module (fetched automatically by Go)
 
 ---
 
 ## Installation
 
-Clone or place this repo next to [gomingleDB](../gomingleDB), then build:
+Clone this repo, then build:
 
 ```bash
 cd mingledb-cli
@@ -256,8 +256,8 @@ Bye.
 
 ## Related
 
-- [MingleDB](https://github.com/marcuwynu23/mingledb) — Node.js implementation
-- [gomingleDB](../gomingleDB) — Go implementation (used by this CLI)
+- [MingleDB](https://github.com/mingledb/mingledb) — Node.js implementation
+- [gomingleDB](https://github.com/mingledb/gomingleDB) — Go implementation (used by this CLI)
 
 ---
 
