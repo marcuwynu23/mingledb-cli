@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"gomingleDB"
+	"github.com/mingledb/gomingleDB"
 )
 
 // captureStdoutStderr runs fn and returns combined stdout and stderr output.

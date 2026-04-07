@@ -3,7 +3,7 @@
 ## Release (GitHub + binaries)
 
 1. **Ensure gomingleDB is on GitHub**  
-   The release workflow expects a repo named `gomingleDB` under the **same owner** as `mingledb-cli` (e.g. `marcuwynu23/gomingleDB`). If your gomingleDB repo is elsewhere, edit `.github/workflows/release.yml` and set the `repository` in the "Checkout gomingleDB" step.
+   The release workflow checks out `mingledb/gomingleDB` and uses a local module replace during build. Ensure the `gomingleDB` repo exists under the `mingledb` org.
 
 2. **Tag and push**
    ```bash
@@ -13,7 +13,7 @@
 
 3. **What runs**
    - Workflow **Release** runs on push of tags `v*`.
-   - It checks out **mingledb-cli** and **gomingleDB** (sibling), builds the CLI for linux/windows/darwin (amd64 + arm64), and creates a **GitHub Release** with the binaries attached.
+   - It checks out **mingledb-cli** and **gomingleDB**, applies `go mod` replace to the checked-out dependency, builds the CLI for linux/windows/darwin (amd64 + arm64), and creates a **GitHub Release** with the binaries attached.
 
 4. **Download**
    Users get the binaries from the **Releases** page of the mingledb-cli repo (e.g. `mgdb-linux-amd64.tar.gz`, `mgdb-windows-amd64.zip`, etc.).
@@ -22,7 +22,7 @@
 
 ## Local build (no CI)
 
-With gomingleDB next to mingledb-cli (e.g. `../gomingleDB`):
+With `gomingleDB` next to `mingledb-cli` (e.g. `../gomingleDB`):
 
 ```bash
 cd mingledb-cli

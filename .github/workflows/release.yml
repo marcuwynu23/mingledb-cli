@@ -39,13 +39,19 @@ jobs:
       - name: Checkout mingledb-cli
         uses: actions/checkout@v4
 
+      - name: Checkout gomingleDB dependency
+        uses: actions/checkout@v4
+        with:
+          repository: mingledb/gomingleDB
+          path: gomingleDB
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.23.5"
 
-      - name: Get gomingleDB from GitHub
-        run: go get gomingleDB@v1.0.0
+      - name: Point module replace to checked out dependency
+        run: go mod edit -replace=github.com/mingledb/gomingleDB=./gomingleDB
 
       - name: Get version from tag
         id: tag

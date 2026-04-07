@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"gomingleDB"
+	"github.com/mingledb/gomingleDB"
 )
 
 var version = "1.0" // set by -ldflags on release build
