@@ -2,6 +2,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
+github.com/mingledb/gomingleDB v1.1.0 h1:VGCS59PRKQ6eiOQHVtrTqem8+Aw1yD6Lq//odIw3JEM=
+github.com/mingledb/gomingleDB v1.1.0/go.mod h1:ukjK/K7ZPPcoP8+x+OUv7ayy2q7EechwDr2g3tvw4KQ=
 github.com/reeflective/readline v1.1.4 h1:HEdVYiPZ7e2CrP3uU/l6wApQdpkY0MjR8lINNboVtFk=
 github.com/reeflective/readline v1.1.4/go.mod h1:CwNkh9BmFBBCSO6mdDaNWb34rOqQsI9eYbxyqvOEazY=
 github.com/rivo/uniseg v0.4.4 h1:8TfxU8dW6PdqD27gjM8MVNuicgxIjxpm4K7x4jp8sis=
