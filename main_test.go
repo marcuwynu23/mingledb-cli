@@ -40,11 +40,11 @@ func TestResolveDBPath(t *testing.T) {
 	if got != dir {
 		t.Errorf("resolveDBPath(dir) = %q, want %q", got, dir)
 	}
-	// .mgdb file path → directory of file
+	// .mgdb file path remains the file path
 	mgdbPath := filepath.Join(dir, "store.mgdb")
 	got = resolveDBPath(mgdbPath)
-	if got != dir {
-		t.Errorf("resolveDBPath(.mgdb) = %q, want dir %q", got, dir)
+	if got != mgdbPath {
+		t.Errorf("resolveDBPath(.mgdb) = %q, want %q", got, mgdbPath)
 	}
 }
 
@@ -169,7 +169,7 @@ func TestParseJSON(t *testing.T) {
 func TestRunCommand_Exit(t *testing.T) {
 	dir := t.TempDir()
 	absDir, _ := filepath.Abs(dir)
-	sess := &session{db: gomingleDB.New(absDir), dbDir: absDir}
+	sess := &session{db: gomingleDB.New(absDir), dbDir: absDir, displayPath: absDir}
 	out := captureStdoutStderr(func() {
 		runCommand(sess, ".exit")
 	})
@@ -181,7 +181,7 @@ func TestRunCommand_Exit(t *testing.T) {
 func TestRunDotCommand_Help(t *testing.T) {
 	dir := t.TempDir()
 	absDir, _ := filepath.Abs(dir)
-	sess := &session{db: gomingleDB.New(absDir), dbDir: absDir}
+	sess := &session{db: gomingleDB.New(absDir), dbDir: absDir, displayPath: absDir}
 	out := captureStdoutStderr(func() {
 		runDotCommand(sess, ".help")
 	})
@@ -193,7 +193,7 @@ func TestRunDotCommand_Help(t *testing.T) {
 func TestRunDotCommand_Databases(t *testing.T) {
 	dir := t.TempDir()
 	absDir, _ := filepath.Abs(dir)
-	sess := &session{db: gomingleDB.New(absDir), dbDir: absDir}
+	sess := &session{db: gomingleDB.New(absDir), dbDir: absDir, displayPath: absDir}
 	out := captureStdoutStderr(func() {
 		runDotCommand(sess, ".databases")
 	})
