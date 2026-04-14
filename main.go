@@ -23,7 +23,7 @@ const (
 	helpMessage = `Dot commands:
   .exit, .quit       Exit the CLI
   .help              Show this help
-  .databases         Show current database directory
+  .databases         Show current database path
   .open PATH         Open database (PATH: directory or .mgdb file)
   .collections       List collection names
   .schema [NAME]     Show schema for collection (or list if no NAME)
@@ -31,7 +31,7 @@ const (
   .auth login U P    Log in as user U
   .auth logout       Log out current session
   .auth status       Show logged-in user
-  .system CMD        Run system command (e.g. .system ls -la)
+  .system/.sys CMD   Run system command (e.g. .system ls -la)
   .output PATH       Save in-memory database to file (directory or .mgdb path)
 
 Data commands (JSON for docs/filters):
@@ -45,32 +45,34 @@ Data commands (JSON for docs/filters):
 )
 
 type session struct {
-	db      *gomingleDB.MingleDB
-	dbDir   string
-	tempDir string // when set, DB is in-memory (temp dir); cleaned up on exit or .output/.open
+	db          *gomingleDB.MingleDB
+	dbDir       string
+	displayPath string
+	tempDir     string // when set, DB is in-memory (temp dir); cleaned up on exit or .output/.open
 }
 
-// resolveDBPath returns the database directory. If path ends with .mgdb, use its directory (so a file path means "use the dir containing this file").
-func resolveDBPath(path string) string {
+// resolveDBPaths returns storage directory and display path.
+// If path ends with .mgdb, storage uses its directory and display path keeps the file path.
+func resolveDBPaths(path string) (dbDir, displayPath string) {
 	abs, _ := filepath.Abs(path)
 	if strings.HasSuffix(strings.ToLower(abs), ".mgdb") {
-		return filepath.Dir(abs)
+		return filepath.Dir(abs), abs
 	}
-	return abs
+	return abs, abs
 }
 
 func main() {
 	var sess *session
 	if len(os.Args) > 1 {
-		dbDir := resolveDBPath(os.Args[1])
-		sess = &session{db: gomingleDB.New(dbDir), dbDir: dbDir}
+		dbDir, displayPath := resolveDBPaths(os.Args[1])
+		sess = &session{db: gomingleDB.New(dbDir), dbDir: dbDir, displayPath: displayPath}
 	} else {
 		tempDir, err := os.MkdirTemp("", "mgdb-")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "mgdb: could not create in-memory DB:", err)
 			os.Exit(1)
 		}
-		sess = &session{db: gomingleDB.New(tempDir), dbDir: tempDir, tempDir: tempDir}
+		sess = &session{db: gomingleDB.New(tempDir), dbDir: tempDir, displayPath: "(memory)", tempDir: tempDir}
 	}
 	defer func() {
 		if sess != nil && sess.tempDir != "" {
@@ -105,6 +107,28 @@ func main() {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
+		}
+		if strings.HasPrefix(line, ".") {
+			// Dot commands run as-is (except explicit "\" continuation above).
+		} else if strings.Contains(line, "{") {
+			// For data commands, continue reading until expected JSON object(s) are complete.
+			cmd, _ := splitFirstWord(line)
+			expectedObjects := expectedJSONObjectCount(strings.ToLower(cmd))
+			lineBuf.Reset()
+			lineBuf.WriteString(line)
+			for !hasRequiredJSONObjects(lineBuf.String(), expectedObjects) {
+				fmt.Fprint(os.Stderr, "   ...> ")
+				if !scanner.Scan() {
+					break
+				}
+				next := strings.TrimSpace(scanner.Text())
+				if next == "" {
+					continue
+				}
+				lineBuf.WriteString(" ")
+				lineBuf.WriteString(next)
+			}
+			line = strings.TrimSpace(lineBuf.String())
 		}
 
 		done := runCommand(sess, line)
@@ -149,7 +173,7 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		if sess.tempDir != "" {
 			fmt.Println("(memory)")
 		} else {
-			fmt.Println(db.DBDir())
+			fmt.Println(sess.displayPath)
 		}
 		return false
 	case ".open":
@@ -162,10 +186,11 @@ func runDotCommand(sess *session, line string) (exit bool) {
 			sess.tempDir = ""
 		}
 		path := parts[1]
-		absPath := resolveDBPath(path)
-		sess.dbDir = absPath
-		sess.db = gomingleDB.New(absPath)
-		fmt.Fprintln(os.Stderr, "Opened", absPath)
+		dbDir, displayPath := resolveDBPaths(path)
+		sess.dbDir = dbDir
+		sess.displayPath = displayPath
+		sess.db = gomingleDB.New(dbDir)
+		fmt.Fprintln(os.Stderr, "Opened", displayPath)
 		return false
 	case ".output":
 		if len(parts) < 2 {
@@ -182,14 +207,15 @@ func runDotCommand(sess *session, line string) (exit bool) {
 			fmt.Fprintln(os.Stderr, "output path:", err)
 			return false
 		}
+		saveDir := absPath
 		if strings.HasSuffix(strings.ToLower(absPath), ".mgdb") {
-			absPath = filepath.Dir(absPath)
+			saveDir = filepath.Dir(absPath)
 		}
-		if err := os.MkdirAll(absPath, 0755); err != nil {
+		if err := os.MkdirAll(saveDir, 0755); err != nil {
 			fmt.Fprintln(os.Stderr, "output:", err)
 			return false
 		}
-		outDB := gomingleDB.New(absPath)
+		outDB := gomingleDB.New(saveDir)
 		colls, err := db.ListCollections()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "output:", err)
@@ -213,7 +239,8 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		}
 		os.RemoveAll(sess.tempDir)
 		sess.tempDir = ""
-		sess.dbDir = absPath
+		sess.dbDir = saveDir
+		sess.displayPath = absPath
 		sess.db = outDB
 		fmt.Fprintln(os.Stderr, "Saved to", absPath)
 		return false
@@ -263,10 +290,10 @@ func runDotCommand(sess *session, line string) (exit bool) {
 			return false
 		}
 		return runAuth(db, parts)
-	case ".system":
-		cmdLine := strings.TrimSpace(strings.TrimPrefix(line, ".system"))
+	case ".system", ".sys":
+		cmdLine := strings.TrimSpace(strings.TrimPrefix(line, parts[0]))
 		if cmdLine == "" {
-			fmt.Fprintln(os.Stderr, "Usage: .system CMD [args...]")
+			fmt.Fprintln(os.Stderr, "Usage: .system/.sys CMD [args...]")
 			return false
 		}
 		return runSystemCommand(cmdLine)
@@ -626,6 +653,99 @@ func parseJSON(s string) (map[string]interface{}, error) {
 
 func parseJSONObject(s string) (map[string]interface{}, error) {
 	return parseJSON(s)
+}
+
+func hasBalancedJSONBraces(s string) bool {
+	inString := false
+	escaped := false
+	depth := 0
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		if ch == '"' {
+			inString = true
+			continue
+		}
+		if ch == '{' {
+			depth++
+		} else if ch == '}' {
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
+	return depth == 0
+}
+
+func expectedJSONObjectCount(cmd string) int {
+	switch cmd {
+	case "update":
+		return 2
+	case "insert", "find", "findone", "delete", "schema":
+		return 1
+	default:
+		return 1
+	}
+}
+
+func hasRequiredJSONObjects(s string, required int) bool {
+	if required <= 0 {
+		return true
+	}
+	inString := false
+	escaped := false
+	depth := 0
+	completed := 0
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		if ch == '"' {
+			inString = true
+			continue
+		}
+		if ch == '{' {
+			depth++
+			continue
+		}
+		if ch == '}' {
+			if depth > 0 {
+				depth--
+				if depth == 0 {
+					completed++
+				}
+			}
+		}
+	}
+	if completed < required {
+		return false
+	}
+	return depth == 0 && !inString
 }
 
 // resolveRegexInFilter converts $regex string in filter to *regexp.Regexp for gomingleDB.
