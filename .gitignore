@@ -4,3 +4,4 @@ mgdb
 mgdb.exe
 mydb/
 *.test
+*.mgdb
