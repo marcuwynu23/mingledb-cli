@@ -9,7 +9,6 @@
   <img src="https://img.shields.io/github/license/mingledb/mingledb-cli.svg" alt="License Badge"/>
 </p>
 
-# MingleDB CLI
 
 Interactive shell for MingleDB and gomingleDB.
 
