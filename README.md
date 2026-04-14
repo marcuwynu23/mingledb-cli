@@ -1,30 +1,34 @@
+<div align="center">
+  <h1>MingleDB CLI</h1>
+</div>
+
+<p align="center">
+  <img src="https://img.shields.io/github/stars/mingledb/mingledb-cli.svg" alt="Stars Badge"/>
+  <img src="https://img.shields.io/github/forks/mingledb/mingledb-cli.svg" alt="Forks Badge"/>
+  <img src="https://img.shields.io/github/issues/mingledb/mingledb-cli.svg" alt="Issues Badge"/>
+  <img src="https://img.shields.io/github/license/mingledb/mingledb-cli.svg" alt="License Badge"/>
+</p>
+
 # MingleDB CLI
 
-**An interactive shell for MingleDB.**  
-Connect to a `.mgdb` database file (or a directory that resolves to one file) and run queries, manage collections, and handle auth from the terminal.
-
----
-
-## Overview
+Interactive shell for MingleDB and gomingleDB.
 
 MingleDB CLI is the official command-line interface for [MingleDB](https://github.com/mingledb/mingledb) and [gomingleDB](https://github.com/mingledb/gomingleDB). It provides a familiar, REPL-style experience similar to the SQLite shell: dot commands for meta-operations and data commands for CRUD.
 
-| Feature          | Description                                                                |
-| ---------------- | -------------------------------------------------------------------------- |
-| **Dot commands** | `.exit`, `.databases`, `.collections`, `.tables`, `.schema`, `.open`, `.auth`, `.system`, `.output` |
-| **CRUD**         | `insert`, `find`, `findOne`, `update`, `delete` with JSON docs and filters |
-| **Schema**       | Define and inspect collection schemas from the shell                       |
-| **Auth**         | Register, login, logout, and check session status                          |
-| **Portable**     | Single binary; works with any mingleDB/gomingleDB `.mgdb` single-file database |
+## Overview
 
----
+Connect to a `.mgdb` database file (or a directory that resolves to one file), run queries, manage collections, and handle auth from the terminal.
+
+## Features
+
+- Dot commands: `.exit`, `.databases`, `.collections`, `.tables`, `.schema`, `.open`, `.auth`, `.system`, `.output`
+- Data commands: `insert`, `find`, `findOne`, `update`, `delete`, `schema`
+- In-memory mode with `.output` to save
+- Single binary distribution
 
 ## Prerequisites
 
 - **Go 1.21+**
-- Access to the `github.com/mingledb/gomingleDB` module (fetched automatically by Go)
-
----
 
 ## Installation
 
@@ -42,8 +46,6 @@ go build -o mgdb.exe .
 ```
 
 The binary is self-contained; you can move it anywhere and run it against any mingleDB database file.
-
----
 
 ## Quick Start
 
@@ -64,8 +66,6 @@ mingledb> insert users {"name":"Alice","email":"alice@example.com","age":30}
 mingledb> find users
 mingledb> .exit
 ```
-
----
 
 ## Dot Commands
 
@@ -213,8 +213,6 @@ Use these inside filter/query JSON for `find`, `findOne`, `update`, and `delete`
 
 You can combine operators (e.g. `{"age":{"$gte":18,"$lt":60}}`).
 
----
-
 ## Example Session
 
 ```text
@@ -258,14 +256,16 @@ mingledb> .exit
 Bye.
 ```
 
----
-
 ## Related
 
 - [MingleDB](https://github.com/mingledb/mingledb) — Node.js implementation
 - [gomingleDB](https://github.com/mingledb/gomingleDB) — Go implementation (used by this CLI)
 
----
+## Testing
+
+```bash
+go test ./...
+```
 
 ## Community Standards
 
@@ -277,8 +277,6 @@ Bye.
 - Funding: [`.github/FUNDING.yml`](./.github/FUNDING.yml)
 - Bug reports and feature requests: [Issue templates](./.github/ISSUE_TEMPLATE/)
 - Pull requests: [PR template](./.github/pull_request_template.md)
-
----
 
 ## License
 
