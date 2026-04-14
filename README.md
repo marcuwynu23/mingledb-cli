@@ -267,6 +267,19 @@ Bye.
 
 ---
 
+## Community Standards
+
+- Contribution guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Code of conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
+- Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+- Publishing guide: [`PUBLISH.md`](./PUBLISH.md)
+- License: [`LICENSE`](./LICENSE)
+- Funding: [`.github/FUNDING.yml`](./.github/FUNDING.yml)
+- Bug reports and feature requests: [Issue templates](./.github/ISSUE_TEMPLATE/)
+- Pull requests: [PR template](./.github/pull_request_template.md)
+
+---
+
 ## License
 
 MIT
