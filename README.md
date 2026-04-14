@@ -1,7 +1,7 @@
 # MingleDB CLI
 
-**A interactive shell for MingleDB.**  
-Connect to any `.mgdb` database directory and run queries, manage collections, and handle auth from the terminal.
+**An interactive shell for MingleDB.**  
+Connect to a `.mgdb` database file (or a directory that resolves to one file) and run queries, manage collections, and handle auth from the terminal.
 
 ---
 
@@ -11,11 +11,11 @@ MingleDB CLI is the official command-line interface for [MingleDB](https://githu
 
 | Feature          | Description                                                                |
 | ---------------- | -------------------------------------------------------------------------- |
-| **Dot commands** | `.exit`, `.databases`, `.collections`, `.schema`, `.open`, `.auth`, `.system` |
+| **Dot commands** | `.exit`, `.databases`, `.collections`, `.tables`, `.schema`, `.open`, `.auth`, `.system`, `.output` |
 | **CRUD**         | `insert`, `find`, `findOne`, `update`, `delete` with JSON docs and filters |
 | **Schema**       | Define and inspect collection schemas from the shell                       |
 | **Auth**         | Register, login, logout, and check session status                          |
-| **Portable**     | Single binary; works with any mingleDB/gomingleDB `.mgdb` directory        |
+| **Portable**     | Single binary; works with any mingleDB/gomingleDB `.mgdb` single-file database |
 
 ---
 
@@ -41,17 +41,18 @@ On Windows:
 go build -o mgdb.exe .
 ```
 
-The binary is self-contained; you can move it anywhere and run it against any mingleDB database directory.
+The binary is self-contained; you can move it anywhere and run it against any mingleDB database file.
 
 ---
 
 ## Quick Start
 
-Open a database (default directory is `./mydb` if no path is given):
+Open a database (starts in in-memory mode if no path is given):
 
 ```bash
-./mgdb                    # use ./mydb
-./mgdb /path/to/db        # use specified directory
+./mgdb                          # in-memory database
+./mgdb /path/to/app.mgdb        # explicit database file
+./mgdb /path/to/data            # directory -> /path/to/data/database.mgdb
 ```
 
 Then at the prompt:
@@ -74,15 +75,17 @@ All meta-commands start with a dot (`.`). They control the session, current data
 | -------------------------- | -------------------------------------------------------------------------------------------------- |
 | `.exit`                    | Exit the shell (alias: `.quit`)                                                                    |
 | `.help`                    | Print help and command reference                                                                   |
-| `.databases`               | Print the current database directory path                                                          |
-| `.open PATH`               | Switch to another database directory                                                               |
-| `.collections`             | List all collection names                                                                         |
+| `.databases`               | Print current database path (or `(memory)` if in-memory)                                          |
+| `.open PATH`               | Switch to another database path (`.mgdb` file or directory)                                       |
+| `.collections`             | List all collection names                                                                          |
+| `.tables`                  | Alias for `.collections`                                                                           |
 | `.schema [NAME]`           | With `NAME`: show schema for that collection. Without: list collections that have a schema defined |
 | `.auth register USER PASS` | Register a new user                                                                                |
 | `.auth login USER PASS`    | Log in as a user                                                                                   |
 | `.auth logout`             | End the current session                                                                            |
 | `.auth status`             | Show the currently logged-in user (or "not logged in")                                             |
 | `.system CMD [args...]`    | Run a system command (e.g. `.system ls -la`, `.system dir`)                                        |
+| `.output PATH`             | Save in-memory database to disk path (`.mgdb` file or directory)                                  |
 
 ---
 
@@ -224,6 +227,9 @@ mingledb> .databases
 /path/to/data
 
 mingledb> .collections
+users
+
+mingledb> .tables
 users
 
 mingledb> insert users {"name":"Alice","email":"alice@example.com","age":30}
