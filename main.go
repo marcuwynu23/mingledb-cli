@@ -2,9 +2,10 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,34 +15,21 @@ import (
 	"strings"
 
 	"github.com/mingledb/gomingleDB"
+	"github.com/reeflective/readline"
 )
 
 var version = "1.0" // set by -ldflags on release build
 
 const (
-	prompt     = "mingledb> "
-	helpMessage = `Dot commands:
-  .exit, .quit       Exit the CLI
-  .help              Show this help
-  .databases         Show current database path
-  .open PATH         Open database (PATH: directory or .mgdb file)
-  .collections       List collection names
-  .schema [NAME]     Show schema for collection (or list if no NAME)
-  .auth register U P Register user U with password P
-  .auth login U P    Log in as user U
-  .auth logout       Log out current session
-  .auth status       Show logged-in user
-  .system/.sys CMD   Run system command (e.g. .system ls -la)
-  .output PATH       Save in-memory database to file (directory or .mgdb path)
-
-Data commands (JSON for docs/filters):
-  insert COLL DOC                    e.g. insert users {"name":"Alice","age":30}
-  find COLL [FILTER]                 e.g. find users {"age":{"$gte":18}}
-  findOne COLL [FILTER]              e.g. findOne users {"email":"a@b.com"}
-  update COLL QUERY UPDATE            e.g. update users {"id":1} {"age":31}
-  delete COLL QUERY                  e.g. delete users {"email":"x@y.com"}
-  schema COLL DEF                    e.g. schema users {"name":{"type":"string","required":true}}
-`
+	prompt            = "mingledb> "
+	contPrompt        = "...> "
+	accentColor       = "\x1b[38;2;21;153;144m" // #159990
+	whiteColor        = "\x1b[97m"
+	memoryColor       = "\x1b[38;2;230;74;25m" // #e64a19
+	resetColor        = "\x1b[0m"
+	bold              = "\x1b[1m"
+	historyFile       = ".mgdb_history"
+	styledMemoryLabel = "(" + bold + memoryColor + "memory" + resetColor + ")"
 )
 
 type session struct {
@@ -51,14 +39,16 @@ type session struct {
 	tempDir     string // when set, DB is in-memory (temp dir); cleaned up on exit or .output/.open
 }
 
-// resolveDBPaths returns storage directory and display path.
-// If path ends with .mgdb, storage uses its directory and display path keeps the file path.
-func resolveDBPaths(path string) (dbDir, displayPath string) {
+// resolveDBPaths returns database path input and display path.
+func resolveDBPaths(path string) (dbPath, displayPath string) {
 	abs, _ := filepath.Abs(path)
-	if strings.HasSuffix(strings.ToLower(abs), ".mgdb") {
-		return filepath.Dir(abs), abs
-	}
 	return abs, abs
+}
+
+// Backward-compatible helper used by tests.
+func resolveDBPath(path string) string {
+	dbPath, _ := resolveDBPaths(path)
+	return dbPath
 }
 
 func main() {
@@ -80,64 +70,43 @@ func main() {
 		}
 	}()
 
-	fmt.Fprintf(os.Stderr, "mgdb %s\nType .help for commands.\n\n", version)
+	fmt.Fprintf(os.Stderr, "%smgdb %s%s\nType .help for commands.\n\n", accentColor, version, resetColor)
 
-	scanner := bufio.NewScanner(os.Stdin)
-	var lineBuf strings.Builder
+	rl := readline.NewShell()
+	rl.Prompt.Primary(func() string { return accentColor + prompt + resetColor })
+	rl.Prompt.Secondary(func() string { return accentColor + contPrompt + resetColor })
+	_ = rl.Config.Set("history-autosuggest", true)
+	rl.AcceptMultiline = func(line []rune) bool {
+		return isInputComplete(string(line))
+	}
+	rl.Completer = buildCompleter(sess)
+	if historyPath, ok := resolveHistoryPath(); ok {
+		seedHistoryFile(historyPath)
+		rl.History.AddFromFile("mgdb", historyPath)
+	}
+
 	for {
-		fmt.Fprint(os.Stderr, prompt)
-		if !scanner.Scan() {
-			break
-		}
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		// Multi-line: if line ends with \, continue reading
-		for strings.HasSuffix(line, "\\") {
-			line = strings.TrimSuffix(line, "\\")
-			lineBuf.Reset()
-			lineBuf.WriteString(line)
-			fmt.Fprint(os.Stderr, "   ...> ")
-			if !scanner.Scan() {
+		line, err := rl.Readline()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
 				break
 			}
-			line = lineBuf.String() + " " + strings.TrimSpace(scanner.Text())
+			if errors.Is(err, readline.ErrInterrupt) {
+				fmt.Fprintln(os.Stderr)
+				continue
+			}
+			fmt.Fprintln(os.Stderr, "read error:", err)
+			break
 		}
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
-		}
-		if strings.HasPrefix(line, ".") {
-			// Dot commands run as-is (except explicit "\" continuation above).
-		} else if strings.Contains(line, "{") {
-			// For data commands, continue reading until expected JSON object(s) are complete.
-			cmd, _ := splitFirstWord(line)
-			expectedObjects := expectedJSONObjectCount(strings.ToLower(cmd))
-			lineBuf.Reset()
-			lineBuf.WriteString(line)
-			for !hasRequiredJSONObjects(lineBuf.String(), expectedObjects) {
-				fmt.Fprint(os.Stderr, "   ...> ")
-				if !scanner.Scan() {
-					break
-				}
-				next := strings.TrimSpace(scanner.Text())
-				if next == "" {
-					continue
-				}
-				lineBuf.WriteString(" ")
-				lineBuf.WriteString(next)
-			}
-			line = strings.TrimSpace(lineBuf.String())
 		}
 
 		done := runCommand(sess, line)
 		if done {
 			break
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, "read error:", err)
 	}
 }
 
@@ -163,7 +132,7 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		fmt.Fprintln(os.Stderr, "Bye.")
 		return true
 	case ".help", ".h":
-		fmt.Fprint(os.Stderr, helpMessage)
+		fmt.Fprint(os.Stderr, buildHelpMessage())
 		return false
 	case ".databases":
 		if db == nil {
@@ -171,7 +140,7 @@ func runDotCommand(sess *session, line string) (exit bool) {
 			return false
 		}
 		if sess.tempDir != "" {
-			fmt.Println("(memory)")
+			fmt.Println(styledMemoryLabel)
 		} else {
 			fmt.Println(sess.displayPath)
 		}
@@ -207,15 +176,11 @@ func runDotCommand(sess *session, line string) (exit bool) {
 			fmt.Fprintln(os.Stderr, "output path:", err)
 			return false
 		}
-		saveDir := absPath
-		if strings.HasSuffix(strings.ToLower(absPath), ".mgdb") {
-			saveDir = filepath.Dir(absPath)
-		}
-		if err := os.MkdirAll(saveDir, 0755); err != nil {
+		outDB := gomingleDB.New(absPath)
+		if err := os.MkdirAll(filepath.Dir(outDB.DBDir()), 0755); err != nil {
 			fmt.Fprintln(os.Stderr, "output:", err)
 			return false
 		}
-		outDB := gomingleDB.New(saveDir)
 		colls, err := db.ListCollections()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "output:", err)
@@ -239,12 +204,12 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		}
 		os.RemoveAll(sess.tempDir)
 		sess.tempDir = ""
-		sess.dbDir = saveDir
+		sess.dbDir = outDB.DBDir()
 		sess.displayPath = absPath
 		sess.db = outDB
 		fmt.Fprintln(os.Stderr, "Saved to", absPath)
 		return false
-	case ".collections":
+	case ".collections", ".tables":
 		if db == nil {
 			fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
 			return false
@@ -655,6 +620,24 @@ func parseJSONObject(s string) (map[string]interface{}, error) {
 	return parseJSON(s)
 }
 
+func isInputComplete(line string) bool {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return true
+	}
+	if strings.HasSuffix(line, "\\") {
+		return false
+	}
+	if strings.HasPrefix(line, ".") {
+		return true
+	}
+	cmd, _ := splitFirstWord(line)
+	if cmd == "" || !strings.Contains(line, "{") {
+		return true
+	}
+	return hasRequiredJSONObjects(line, expectedJSONObjectCount(strings.ToLower(cmd)))
+}
+
 func hasBalancedJSONBraces(s string) bool {
 	inString := false
 	escaped := false
@@ -748,6 +731,86 @@ func hasRequiredJSONObjects(s string, required int) bool {
 	return depth == 0 && !inString
 }
 
+func buildCompleter(sess *session) func(line []rune, cursor int) readline.Completions {
+	dotCommands := []string{
+		".help", ".exit", ".quit", ".databases", ".open", ".collections",
+		".schema", ".auth", ".system", ".sys", ".output", ".tables",
+	}
+	dataCommands := []string{"insert", "find", "findOne", "update", "delete", "schema"}
+	authCommands := []string{"register", "login", "logout", "status"}
+
+	return func(line []rune, cursor int) readline.Completions {
+		if cursor < 0 || cursor > len(line) {
+			cursor = len(line)
+		}
+		input := string(line[:cursor])
+		trimmed := strings.TrimLeft(input, " \t")
+		if trimmed == "" {
+			return readline.CompleteValues(append(dotCommands, dataCommands...)...).Tag("commands")
+		}
+
+		fields := strings.Fields(trimmed)
+		if len(fields) == 0 {
+			return readline.CompleteValues(append(dotCommands, dataCommands...)...).Tag("commands")
+		}
+
+		first := strings.ToLower(fields[0])
+		endsWithSpace := strings.HasSuffix(input, " ")
+
+		if strings.HasPrefix(first, ".") {
+			if len(fields) == 1 && !endsWithSpace {
+				return readline.CompleteValues(dotCommands...).Tag("dot commands")
+			}
+			if first == ".auth" && (len(fields) == 1 || (len(fields) == 2 && !endsWithSpace)) {
+				return readline.CompleteValues(authCommands...).Tag("auth")
+			}
+			return readline.Message("dot command")
+		}
+
+		if len(fields) == 1 && !endsWithSpace {
+			return readline.CompleteValues(dataCommands...).Tag("data commands")
+		}
+
+		if sess != nil && sess.db != nil && (len(fields) == 2 && !endsWithSpace || len(fields) >= 2 && endsWithSpace) {
+			colls, err := sess.db.ListCollections()
+			if err == nil && len(colls) > 0 {
+				sort.Strings(colls)
+				return readline.CompleteValues(colls...).Tag("collections")
+			}
+		}
+
+		return readline.Message("json")
+	}
+}
+
+func resolveHistoryPath() (string, bool) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return "", false
+	}
+	return filepath.Join(home, historyFile), true
+}
+
+func seedHistoryFile(path string) {
+	if _, err := os.Stat(path); err == nil {
+		return
+	}
+	seed := strings.Join([]string{
+		".help",
+		".databases",
+		".collections",
+		".schema",
+		".system",
+		".sys",
+		"find",
+		"insert",
+		"update",
+		"delete",
+		"schema",
+	}, "\n") + "\n"
+	_ = os.WriteFile(path, []byte(seed), 0644)
+}
+
 // resolveRegexInFilter converts $regex string in filter to *regexp.Regexp for gomingleDB.
 func resolveRegexInFilter(m map[string]interface{}) {
 	for _, v := range m {
@@ -779,4 +842,42 @@ func printDocs(docs []map[string]interface{}) {
 	} else {
 		fmt.Fprintf(os.Stderr, "(%d document(s))\n", len(docs))
 	}
+}
+
+func buildHelpMessage() string {
+	return fmt.Sprintf(`%s%sMingleDB CLI Help%s
+
+%sDot Commands%s
+%s  .help              Show this help
+  .exit, .quit       Exit the CLI
+  .databases         Show current database path
+  .open PATH         Open database (PATH: directory or .mgdb file)
+  .collections       List collection names
+  .tables            Alias for .collections
+  .schema [NAME]     Show schema for collection (or list if no NAME)
+  .auth register U P Register user U with password P
+  .auth login U P    Log in as user U
+  .auth logout       Log out current session
+  .auth status       Show logged-in user
+  .system/.sys CMD   Run system command (e.g. .system ls -la)
+  .output PATH       Save in-%smemory%s database to file
+
+%sData Commands%s %s(JSON docs / filters)%s
+%s  insert COLL DOC        e.g. insert users {"name":"Alice","age":30}
+  find COLL [FILTER]     e.g. find users {"age":{"$gte":18}}
+  findOne COLL [FILTER]  e.g. findOne users {"email":"a@b.com"}
+  update COLL QUERY UPDATE e.g. update users {"id":1} {"age":31}
+  delete COLL QUERY      e.g. delete users {"email":"x@y.com"}
+  schema COLL DEF        e.g. schema users {"name":{"type":"string","required":true}}%s
+
+%sTip:%s %suse .databases to confirm whether you're on-disk or %smemory%s%s.
+`,
+		bold, accentColor, resetColor,
+		bold+accentColor, resetColor,
+		whiteColor,
+		bold+memoryColor, resetColor,
+		bold+accentColor, resetColor, whiteColor, resetColor,
+		whiteColor, resetColor,
+		bold+accentColor, resetColor, whiteColor, bold+memoryColor, resetColor, whiteColor,
+	)
 }
