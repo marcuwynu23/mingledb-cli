@@ -74,9 +74,14 @@ func main() {
 	fmt.Fprintf(os.Stderr, "%smgdb %s%s\nType .help for commands.\n\n", accentColor, version, resetColor)
 
 	rl := readline.NewShell()
-	rl.Prompt.Primary(func() string { return accentColor + prompt + resetColor })
-	rl.Prompt.Secondary(func() string { return accentColor + contPrompt + resetColor })
-	_ = rl.Config.Set("history-autosuggest", true)
+    rl.Prompt.Primary(func() string { return accentColor + prompt + resetColor })
+    rl.Prompt.Secondary(func() string { return accentColor + contPrompt + resetColor })
+    _ = rl.Config.Set("history-autosuggest", true)
+	// Disable features that cause display distortion
+	_ = rl.Config.Set("history-autosuggest", false)
+	_ = rl.Config.Set("syntax-highlighting", false)
+	_ = rl.Config.Set("completions-on-trigger", false)
+	_ = rl.Config.Set("completion-menu", false)
 	rl.AcceptMultiline = func(line []rune) bool {
 		return isInputComplete(string(line))
 	}
@@ -101,6 +106,7 @@ func main() {
 		}
 		line = strings.TrimSpace(line)
 		if line == "" {
+			fmt.Println()
 			continue
 		}
 
@@ -280,6 +286,9 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		return runSystemCommand(cmdLine)
 	case ".mode":
 		return runMode(sess, parts)
+	case ".clear":
+		fmt.Print("\033[H\033[2J")
+		return false
 	default:
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintf(os.Stderr, "Unknown command: %s (use .help)\n", cmd)
@@ -802,7 +811,7 @@ func hasRequiredJSONObjects(s string, required int) bool {
 func buildCompleter(sess *session) func(line []rune, cursor int) readline.Completions {
 	dotCommands := []string{
 		".help", ".exit", ".quit", ".databases", ".open", ".collections",
-		".schema", ".auth", ".system", ".sys", ".output", ".mode",
+		".schema", ".auth", ".system", ".sys", ".output", ".mode", ".clear",
 	}
 	dataCommands := []string{"insert", "find", "findOne", "update", "delete", "schema"}
 	authCommands := []string{"register", "login", "logout", "status"}
@@ -910,19 +919,18 @@ func printDocs(docs []map[string]interface{}, mode string) {
 	default: // json
 		printDocsJSON(docs)
 	}
+	// Ensure terminal scrolls properly
+	fmt.Println()
 }
 
 func printDocsJSON(docs []map[string]interface{}) {
-	for i, doc := range docs {
-		b, _ := json.MarshalIndent(doc, "  ", "  ")
-		if i > 0 {
-			fmt.Println("---")
-		}
-		fmt.Println(string(b))
+	if len(docs) == 0 {
+		return
 	}
-	if len(docs) > 0 {
-		fmt.Fprintf(os.Stderr, "(%d document(s))\n", len(docs))
-	}
+	// Output as JSON array
+	b, _ := json.MarshalIndent(docs, "", "  ")
+	fmt.Println(string(b))
+	fmt.Fprintf(os.Stderr, "(%d document(s))\n", len(docs))
 }
 
 func printDocsTable(docs []map[string]interface{}) {
@@ -1052,6 +1060,7 @@ func buildHelpMessage() string {
   .system/.sys CMD   Run system command (e.g. .system ls -la)
   .output PATH       Save in-%smemory%s database to file
   .mode [MODE]       Set output mode: json, table, csv, line, list
+  .clear             Clear the terminal screen
 
 %sData Commands%s %s(JSON docs / filters)%s
 %s  insert COLL DOC        e.g. insert users {"name":"Alice","age":30}
