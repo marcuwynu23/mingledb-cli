@@ -37,6 +37,7 @@ type session struct {
 	dbDir       string
 	displayPath string
 	tempDir     string // when set, DB is in-memory (temp dir); cleaned up on exit or .output/.open
+	outputMode  string // json, table, csv, line, list
 }
 
 // resolveDBPaths returns database path input and display path.
@@ -55,14 +56,14 @@ func main() {
 	var sess *session
 	if len(os.Args) > 1 {
 		dbDir, displayPath := resolveDBPaths(os.Args[1])
-		sess = &session{db: gomingleDB.New(dbDir), dbDir: dbDir, displayPath: displayPath}
+		sess = &session{db: gomingleDB.New(dbDir), dbDir: dbDir, displayPath: displayPath, outputMode: "json"}
 	} else {
 		tempDir, err := os.MkdirTemp("", "mgdb-")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "mgdb: could not create in-memory DB:", err)
 			os.Exit(1)
 		}
-		sess = &session{db: gomingleDB.New(tempDir), dbDir: tempDir, displayPath: "(memory)", tempDir: tempDir}
+		sess = &session{db: gomingleDB.New(tempDir), dbDir: tempDir, displayPath: "(memory)", tempDir: tempDir, outputMode: "json"}
 	}
 	defer func() {
 		if sess != nil && sess.tempDir != "" {
@@ -121,7 +122,7 @@ func runCommand(sess *session, line string) (exit bool) {
 		fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
 		return false
 	}
-	return runDataCommand(sess.db, line)
+	return runDataCommand(sess.db, sess, line)
 }
 
 func runDotCommand(sess *session, line string) (exit bool) {
@@ -277,6 +278,8 @@ func runDotCommand(sess *session, line string) (exit bool) {
 			return false
 		}
 		return runSystemCommand(cmdLine)
+	case ".mode":
+		return runMode(sess, parts)
 	default:
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintf(os.Stderr, "Unknown command: %s (use .help)\n", cmd)
@@ -388,7 +391,29 @@ func runAuth(db *gomingleDB.MingleDB, parts []string) bool {
 	return false
 }
 
-func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
+var validModes = []string{"json", "table", "csv", "line", "list"}
+
+func runMode(sess *session, parts []string) bool {
+	if len(parts) < 2 {
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintf(os.Stderr, "Current mode: %s\n", sess.outputMode)
+		fmt.Fprintf(os.Stderr, "Valid modes: %s\n", strings.Join(validModes, ", "))
+		return false
+	}
+	mode := strings.ToLower(parts[1])
+	for _, m := range validModes {
+		if m == mode {
+			sess.outputMode = mode
+			fmt.Fprintln(os.Stderr, "Output mode:", mode)
+			return false
+		}
+	}
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "Invalid mode: %s. Valid modes: %s\n", mode, strings.Join(validModes, ", "))
+	return false
+}
+
+func runDataCommand(db *gomingleDB.MingleDB, sess *session, line string) (exit bool) {
 	cmd, rest := splitFirstWord(line)
 	cmd = strings.ToLower(cmd)
 	if rest == "" {
@@ -440,7 +465,7 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 			fmt.Fprintln(os.Stderr, "find:", err)
 			return false
 		}
-		printDocs(docs)
+		printDocs(docs, sess.outputMode)
 	case "findone":
 		col, jsonStr := splitCollectionAndJSON(rest)
 		if col == "" {
@@ -469,7 +494,7 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 			fmt.Fprintln(os.Stderr, "(no document)")
 			return false
 		}
-		printDocs([]map[string]interface{}{doc})
+		printDocs([]map[string]interface{}{doc}, sess.outputMode)
 	case "update":
 		col, queryStr, updateStr := splitCollectionQueryUpdate(rest)
 		if col == "" || queryStr == "" || updateStr == "" {
@@ -777,7 +802,7 @@ func hasRequiredJSONObjects(s string, required int) bool {
 func buildCompleter(sess *session) func(line []rune, cursor int) readline.Completions {
 	dotCommands := []string{
 		".help", ".exit", ".quit", ".databases", ".open", ".collections",
-		".schema", ".auth", ".system", ".sys", ".output",
+		".schema", ".auth", ".system", ".sys", ".output", ".mode",
 	}
 	dataCommands := []string{"insert", "find", "findOne", "update", "delete", "schema"}
 	authCommands := []string{"register", "login", "logout", "status"}
@@ -872,7 +897,22 @@ func resolveRegexInFilter(m map[string]interface{}) {
 	}
 }
 
-func printDocs(docs []map[string]interface{}) {
+func printDocs(docs []map[string]interface{}, mode string) {
+	switch mode {
+	case "table":
+		printDocsTable(docs)
+	case "csv":
+		printDocsCSV(docs)
+	case "line":
+		printDocsLine(docs)
+	case "list":
+		printDocsList(docs)
+	default: // json
+		printDocsJSON(docs)
+	}
+}
+
+func printDocsJSON(docs []map[string]interface{}) {
 	for i, doc := range docs {
 		b, _ := json.MarshalIndent(doc, "  ", "  ")
 		if i > 0 {
@@ -882,6 +922,116 @@ func printDocs(docs []map[string]interface{}) {
 	}
 	if len(docs) > 0 {
 		fmt.Fprintf(os.Stderr, "(%d document(s))\n", len(docs))
+	}
+}
+
+func printDocsTable(docs []map[string]interface{}) {
+	if len(docs) == 0 {
+		return
+	}
+	// Get all unique keys
+	keys := make(map[string]bool)
+	for _, doc := range docs {
+		for k := range doc {
+			keys[k] = true
+		}
+	}
+	var cols []string
+	for k := range keys {
+		cols = append(cols, k)
+	}
+	sort.Strings(cols)
+
+	// Calculate column widths
+	widths := make(map[string]int)
+	for _, k := range cols {
+		widths[k] = len(k)
+	}
+	for _, doc := range docs {
+		for _, k := range cols {
+			v := ""
+			if doc[k] != nil {
+				v = fmt.Sprintf("%v", doc[k])
+			}
+			if len(v) > widths[k] {
+				widths[k] = len(v)
+			}
+		}
+	}
+
+	// Print header
+	for _, k := range cols {
+		fmt.Printf("%-*s  ", widths[k], k)
+	}
+	fmt.Println()
+	for _, k := range cols {
+		fmt.Print(strings.Repeat("-", widths[k]) + "  ")
+	}
+	fmt.Println()
+
+	// Print rows
+	for _, doc := range docs {
+		for _, k := range cols {
+			v := ""
+			if doc[k] != nil {
+				v = fmt.Sprintf("%v", doc[k])
+			}
+			fmt.Printf("%-*s  ", widths[k], v)
+		}
+		fmt.Println()
+	}
+	fmt.Fprintf(os.Stderr, "(%d document(s))\n", len(docs))
+}
+
+func printDocsCSV(docs []map[string]interface{}) {
+	if len(docs) == 0 {
+		return
+	}
+	// Get all unique keys
+	keys := make(map[string]bool)
+	for _, doc := range docs {
+		for k := range doc {
+			keys[k] = true
+		}
+	}
+	var cols []string
+	for k := range keys {
+		cols = append(cols, k)
+	}
+	sort.Strings(cols)
+
+	// Print header
+	fmt.Println(strings.Join(cols, ","))
+
+	// Print rows
+	for _, doc := range docs {
+		vals := make([]string, len(cols))
+		for i, k := range cols {
+			v := ""
+			if doc[k] != nil {
+				v = fmt.Sprintf("%v", doc[k])
+			}
+			vals[i] = v
+		}
+		fmt.Println(strings.Join(vals, ","))
+	}
+}
+
+func printDocsLine(docs []map[string]interface{}) {
+	for _, doc := range docs {
+		for k, v := range doc {
+			fmt.Printf("%s = %v\n", k, v)
+		}
+		fmt.Println()
+	}
+}
+
+func printDocsList(docs []map[string]interface{}) {
+	for i, doc := range docs {
+		fmt.Printf("Document %d:\n", i+1)
+		for k, v := range doc {
+			fmt.Printf("  %s: %v\n", k, v)
+		}
 	}
 }
 
@@ -901,6 +1051,7 @@ func buildHelpMessage() string {
   .auth status       Show logged-in user
   .system/.sys CMD   Run system command (e.g. .system ls -la)
   .output PATH       Save in-%smemory%s database to file
+  .mode [MODE]       Set output mode: json, table, csv, line, list
 
 %sData Commands%s %s(JSON docs / filters)%s
 %s  insert COLL DOC        e.g. insert users {"name":"Alice","age":30}
