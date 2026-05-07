@@ -117,6 +117,7 @@ func runCommand(sess *session, line string) (exit bool) {
 	}
 	// Data commands
 	if sess.db == nil {
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
 		return false
 	}
@@ -147,6 +148,7 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		return false
 	case ".open":
 		if len(parts) < 2 {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: .open PATH  (PATH can be a directory or a .mgdb file)")
 			return false
 		}
@@ -163,26 +165,31 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		return false
 	case ".output":
 		if len(parts) < 2 {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: .output PATH  (directory or .mgdb path to save in-memory database)")
 			return false
 		}
 		if sess.tempDir == "" {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Database is already on disk. Use .open to switch, or .output only applies to in-memory DB.")
 			return false
 		}
 		path := parts[1]
 		absPath, err := filepath.Abs(path)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "output path:", err)
 			return false
 		}
 		outDB := gomingleDB.New(absPath)
 		if err := os.MkdirAll(filepath.Dir(outDB.DBDir()), 0755); err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "output:", err)
 			return false
 		}
 		colls, err := db.ListCollections()
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "output:", err)
 			return false
 		}
@@ -192,11 +199,13 @@ func runDotCommand(sess *session, line string) (exit bool) {
 			}
 			docs, err := db.Find(col, map[string]interface{}{})
 			if err != nil {
+				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "output:", col, err)
 				return false
 			}
 			for _, doc := range docs {
 				if err := outDB.InsertOne(col, doc); err != nil {
+					fmt.Fprintln(os.Stderr)
 					fmt.Fprintln(os.Stderr, "output:", err)
 					return false
 				}
@@ -211,11 +220,13 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		return false
 	case ".collections", ".tables":
 		if db == nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
 			return false
 		}
 		colls, err := db.ListCollections()
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "collections:", err)
 			return false
 		}
@@ -226,6 +237,7 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		return false
 	case ".schema":
 		if db == nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
 			return false
 		}
@@ -243,6 +255,7 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		name := parts[1]
 		schema, ok := db.GetSchema(name)
 		if !ok {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "No schema for collection:", name)
 			return false
 		}
@@ -251,6 +264,7 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		return false
 	case ".auth":
 		if db == nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
 			return false
 		}
@@ -258,11 +272,13 @@ func runDotCommand(sess *session, line string) (exit bool) {
 	case ".system", ".sys":
 		cmdLine := strings.TrimSpace(strings.TrimPrefix(line, parts[0]))
 		if cmdLine == "" {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: .system/.sys CMD [args...]")
 			return false
 		}
 		return runSystemCommand(cmdLine)
 	default:
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintf(os.Stderr, "Unknown command: %s (use .help)\n", cmd)
 		return false
 	}
@@ -322,6 +338,7 @@ var authUser string
 
 func runAuth(db *gomingleDB.MingleDB, parts []string) bool {
 	if len(parts) < 2 {
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Usage: .auth register|login|logout|status [args]")
 		return false
 	}
@@ -329,20 +346,24 @@ func runAuth(db *gomingleDB.MingleDB, parts []string) bool {
 	switch sub {
 	case "register":
 		if len(parts) < 4 {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: .auth register USERNAME PASSWORD")
 			return false
 		}
 		if err := db.RegisterUser(parts[2], parts[3]); err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "register:", err)
 			return false
 		}
 		fmt.Fprintln(os.Stderr, "User registered.")
 	case "login":
 		if len(parts) < 4 {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: .auth login USERNAME PASSWORD")
 			return false
 		}
 		if err := db.Login(parts[2], parts[3]); err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "login:", err)
 			return false
 		}
@@ -361,6 +382,7 @@ func runAuth(db *gomingleDB.MingleDB, parts []string) bool {
 			fmt.Println("(not logged in)")
 		}
 	default:
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Usage: .auth register|login|logout|status [args]")
 	}
 	return false
@@ -370,6 +392,7 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 	cmd, rest := splitFirstWord(line)
 	cmd = strings.ToLower(cmd)
 	if rest == "" {
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Missing arguments. Use .help")
 		return false
 	}
@@ -378,15 +401,18 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 	case "insert":
 		col, jsonStr := splitCollectionAndJSON(rest)
 		if col == "" {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: insert COLLECTION {json}")
 			return false
 		}
 		doc, err := parseJSON(jsonStr)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "insert json:", err)
 			return false
 		}
 		if err := db.InsertOne(col, doc); err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "insert:", err)
 			return false
 		}
@@ -394,6 +420,7 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 	case "find":
 		col, jsonStr := splitCollectionAndJSON(rest)
 		if col == "" {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: find COLLECTION [filter json]")
 			return false
 		}
@@ -402,12 +429,14 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 			var err error
 			filter, err = parseJSONObject(jsonStr)
 			if err != nil {
+				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "find filter:", err)
 				return false
 			}
 		}
 		docs, err := db.Find(col, filter)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "find:", err)
 			return false
 		}
@@ -415,6 +444,7 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 	case "findone":
 		col, jsonStr := splitCollectionAndJSON(rest)
 		if col == "" {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: findOne COLLECTION [filter json]")
 			return false
 		}
@@ -423,16 +453,19 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 			var err error
 			filter, err = parseJSONObject(jsonStr)
 			if err != nil {
+				fmt.Fprintln(os.Stderr)
 				fmt.Fprintln(os.Stderr, "findOne filter:", err)
 				return false
 			}
 		}
 		doc, err := db.FindOne(col, filter)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "findOne:", err)
 			return false
 		}
 		if doc == nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "(no document)")
 			return false
 		}
@@ -440,21 +473,25 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 	case "update":
 		col, queryStr, updateStr := splitCollectionQueryUpdate(rest)
 		if col == "" || queryStr == "" || updateStr == "" {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: update COLLECTION query_json update_json")
 			return false
 		}
 		query, err := parseJSONObject(queryStr)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "update query:", err)
 			return false
 		}
 		update, err := parseJSONObject(updateStr)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "update update:", err)
 			return false
 		}
 		ok, err := db.UpdateOne(col, query, update)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "update:", err)
 			return false
 		}
@@ -466,16 +503,19 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 	case "delete":
 		col, jsonStr := splitCollectionAndJSON(rest)
 		if col == "" {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: delete COLLECTION query_json")
 			return false
 		}
 		query, err := parseJSONObject(jsonStr)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "delete query:", err)
 			return false
 		}
 		ok, err := db.DeleteOne(col, query)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "delete:", err)
 			return false
 		}
@@ -484,14 +524,34 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 		} else {
 			fmt.Fprintln(os.Stderr, "No document matched.")
 		}
+	case "drop":
+		col := strings.TrimSpace(rest)
+		if col == "" {
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, "Usage: drop COLLECTION")
+			return false
+		}
+		fpath := filepath.Join(db.DBDir(), col+".mgdb")
+		if err := os.Remove(fpath); err != nil {
+			fmt.Fprintln(os.Stderr)
+			if os.IsNotExist(err) {
+				fmt.Fprintln(os.Stderr, "Collection not found:", col)
+			} else {
+				fmt.Fprintln(os.Stderr, "drop:", err)
+			}
+			return false
+		}
+		fmt.Fprintln(os.Stderr, "Dropped collection", col)
 	case "schema":
 		col, jsonStr := splitCollectionAndJSON(rest)
 		if col == "" || jsonStr == "" {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "Usage: schema COLLECTION schema_json")
 			return false
 		}
 		raw, err := parseJSON(jsonStr)
 		if err != nil {
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "schema json:", err)
 			return false
 		}
@@ -516,6 +576,7 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 		db.DefineSchema(col, schema)
 		fmt.Fprintln(os.Stderr, "Schema defined for", col)
 	default:
+		fmt.Fprintln(os.Stderr)
 		fmt.Fprintf(os.Stderr, "Unknown command: %s (use .help)\n", cmd)
 	}
 	return false
@@ -736,7 +797,7 @@ func buildCompleter(sess *session) func(line []rune, cursor int) readline.Comple
 		".help", ".exit", ".quit", ".databases", ".open", ".collections",
 		".schema", ".auth", ".system", ".sys", ".output", ".tables",
 	}
-	dataCommands := []string{"insert", "find", "findOne", "update", "delete", "schema"}
+	dataCommands := []string{"insert", "find", "findOne", "update", "delete", "drop", "schema"}
 	authCommands := []string{"register", "login", "logout", "status"}
 
 	return func(line []rune, cursor int) readline.Completions {
@@ -837,9 +898,7 @@ func printDocs(docs []map[string]interface{}) {
 		}
 		fmt.Println(string(b))
 	}
-	if len(docs) == 0 {
-		fmt.Println("(0 documents)")
-	} else {
+	if len(docs) > 0 {
 		fmt.Fprintf(os.Stderr, "(%d document(s))\n", len(docs))
 	}
 }
@@ -868,6 +927,7 @@ func buildHelpMessage() string {
   findOne COLL [FILTER]  e.g. findOne users {"email":"a@b.com"}
   update COLL QUERY UPDATE e.g. update users {"id":1} {"age":31}
   delete COLL QUERY      e.g. delete users {"email":"x@y.com"}
+  drop COLL              Drop (delete) an entire collection
   schema COLL DEF        e.g. schema users {"name":{"type":"string","required":true}}%s
 
 %sTip:%s %suse .databases to confirm whether you're on-disk or %smemory%s%s.
