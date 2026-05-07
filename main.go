@@ -524,24 +524,6 @@ func runDataCommand(db *gomingleDB.MingleDB, line string) (exit bool) {
 		} else {
 			fmt.Fprintln(os.Stderr, "No document matched.")
 		}
-	case "drop":
-		col := strings.TrimSpace(rest)
-		if col == "" {
-			fmt.Fprintln(os.Stderr)
-			fmt.Fprintln(os.Stderr, "Usage: drop COLLECTION")
-			return false
-		}
-		fpath := filepath.Join(db.DBDir(), col+".mgdb")
-		if err := os.Remove(fpath); err != nil {
-			fmt.Fprintln(os.Stderr)
-			if os.IsNotExist(err) {
-				fmt.Fprintln(os.Stderr, "Collection not found:", col)
-			} else {
-				fmt.Fprintln(os.Stderr, "drop:", err)
-			}
-			return false
-		}
-		fmt.Fprintln(os.Stderr, "Dropped collection", col)
 	case "schema":
 		col, jsonStr := splitCollectionAndJSON(rest)
 		if col == "" || jsonStr == "" {
@@ -797,7 +779,7 @@ func buildCompleter(sess *session) func(line []rune, cursor int) readline.Comple
 		".help", ".exit", ".quit", ".databases", ".open", ".collections",
 		".schema", ".auth", ".system", ".sys", ".output", ".tables",
 	}
-	dataCommands := []string{"insert", "find", "findOne", "update", "delete", "drop", "schema"}
+	dataCommands := []string{"insert", "find", "findOne", "update", "delete", "schema"}
 	authCommands := []string{"register", "login", "logout", "status"}
 
 	return func(line []rune, cursor int) readline.Completions {
@@ -927,7 +909,6 @@ func buildHelpMessage() string {
   findOne COLL [FILTER]  e.g. findOne users {"email":"a@b.com"}
   update COLL QUERY UPDATE e.g. update users {"id":1} {"age":31}
   delete COLL QUERY      e.g. delete users {"email":"x@y.com"}
-  drop COLL              Drop (delete) an entire collection
   schema COLL DEF        e.g. schema users {"name":{"type":"string","required":true}}%s
 
 %sTip:%s %suse .databases to confirm whether you're on-disk or %smemory%s%s.
