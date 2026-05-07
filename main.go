@@ -218,7 +218,7 @@ func runDotCommand(sess *session, line string) (exit bool) {
 		sess.db = outDB
 		fmt.Fprintln(os.Stderr, "Saved to", absPath)
 		return false
-	case ".collections", ".tables":
+	case ".collections":
 		if db == nil {
 			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "No database open. Use .open PATH")
@@ -777,7 +777,7 @@ func hasRequiredJSONObjects(s string, required int) bool {
 func buildCompleter(sess *session) func(line []rune, cursor int) readline.Completions {
 	dotCommands := []string{
 		".help", ".exit", ".quit", ".databases", ".open", ".collections",
-		".schema", ".auth", ".system", ".sys", ".output", ".tables",
+		".schema", ".auth", ".system", ".sys", ".output",
 	}
 	dataCommands := []string{"insert", "find", "findOne", "update", "delete", "schema"}
 	authCommands := []string{"register", "login", "logout", "status"}
@@ -894,7 +894,6 @@ func buildHelpMessage() string {
   .databases         Show current database path
   .open PATH         Open database (PATH: directory or .mgdb file)
   .collections       List collection names
-  .tables            Alias for .collections
   .schema [NAME]     Show schema for collection (or list if no NAME)
   .auth register U P Register user U with password P
   .auth login U P    Log in as user U
